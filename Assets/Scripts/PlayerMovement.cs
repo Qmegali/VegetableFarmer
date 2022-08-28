@@ -10,6 +10,7 @@ public class PlayerMovement : MonoBehaviour
 
     [SerializeField] private InputActionReference _moveAction;
     [SerializeField] private InputActionReference _jumpAction, _crouchAction;
+    [SerializeField] private InputActionReference _specialAction;
 
     // ^ Consider replacement for the action reference list? Move inputs to an input manager and subscribe to them from this class? That would require it present in every scene; too much?
 
@@ -47,6 +48,7 @@ public class PlayerMovement : MonoBehaviour
         _jumpAction.action.canceled += CancelJump;
         _crouchAction.action.started += StartCrouch;
         _crouchAction.action.canceled += CancelCrouch;
+        _specialAction.action.performed += CycleSpecial;
 
         //_boxCollider2D = GetComponent<BoxCollider2D>();
         //_rb = GetComponent<Rigidbody2D>();
@@ -58,6 +60,7 @@ public class PlayerMovement : MonoBehaviour
         _jumpAction.action.canceled -= CancelJump;
         _crouchAction.action.started -= StartCrouch;
         _crouchAction.action.canceled -= CancelCrouch;
+        _specialAction.action.performed -= CycleSpecial;
     }
 
     void Update()
@@ -71,9 +74,24 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+    private void LateUpdate()
+    {
+        UpdateAnimation();
+    }
+
     private void FixedUpdate()
     {
         Move();
+    }
+
+    private void OnCollisionEnter2D(Collision2D collision)
+    {
+        if (_rb.velocity.y < 0.2f * Mathf.Sqrt(-2f * jumpMinHeight * Physics2D.gravity.y)) // If you bump your head while jumping
+        {
+            CancelJump();
+
+            // Note: at some point, a head-bumping animation MUST be added.
+        }
     }
 
     #endregion
@@ -167,9 +185,17 @@ public class PlayerMovement : MonoBehaviour
 
     void CancelJump(InputAction.CallbackContext context)
     {
+        CancelJump();
+    }
+
+    void CancelJump()
+    {
         _LandEvent -= Jump;
         _rb.gravityScale = 1;
-        StopCoroutine(_jumpExtensionCoroutine);
+        if (_jumpExtensionCoroutine != null)
+        {
+            StopCoroutine(_jumpExtensionCoroutine);
+        }
         //Debug.Log("Jump canceled.");
     }
 
@@ -189,7 +215,7 @@ public class PlayerMovement : MonoBehaviour
 
     bool IsGrounded()
     {
-        return Physics2D.OverlapArea(_boxCollider2D.bounds.center + _boxCollider2D.bounds.extents - _boxCollider2D.bounds.extents.x * 0.1f * Vector3.right, _boxCollider2D.bounds.center - _boxCollider2D.bounds.extents + _boxCollider2D.bounds.extents.x * 0.1f * Vector3.right, _ground);
+        return Physics2D.OverlapArea(_boxCollider2D.bounds.center + _boxCollider2D.bounds.extents.x * 0.9f * Vector3.right, _boxCollider2D.bounds.center - _boxCollider2D.bounds.extents + _boxCollider2D.bounds.extents.x * 0.1f * Vector3.right, _ground);
     }
 
     #endregion
@@ -198,7 +224,38 @@ public class PlayerMovement : MonoBehaviour
 
     #region Animation Methods
 
+    private void UpdateAnimation()
+    {
+        if (_moveAction.action.ReadValue<float>() * transform.localScale.x < 0f)
+        {
+            transform.localScale = new Vector2(-transform.localScale.x, transform.localScale.y);
+        }
 
+        _animator.SetBool("Landing", !_wasGrounded && _isGrounded);
+
+        _animator.SetFloat("RelativeSpeed", Mathf.Abs(_rb.velocity.x) / moveSpeed);
+        _animator.SetFloat("VerticalSpeed", 1f / (1f + Mathf.Exp(_rb.velocity.y / 8f)));
+        _animator.SetBool("Crouching", _isCrouched);
+        _animator.SetBool("Airborne", !_isGrounded);
+    }
+
+    #endregion
+
+    //
+
+    #region Special Actions
+
+    private void CycleSpecial(InputAction.CallbackContext context)
+    {
+        if (Time.timeScale == 1)
+        {
+            Time.timeScale = 0.3f;
+        }
+        else
+        {
+            Time.timeScale = 1f;
+        }
+    }
 
     #endregion
 }
