@@ -4,7 +4,7 @@ using UnityEngine;
 
 public class CameraFollow : MonoBehaviour
 {
-    private Vector3 cameraPosition;
+    private Vector3 velocity;
     private Vector3 targetPosition;
 
     [SerializeField] Transform player;
@@ -15,13 +15,12 @@ public class CameraFollow : MonoBehaviour
     void Start()
     {
         targetPosition = transform.position;
-        cameraPosition = targetPosition;
     }
 
-    void LateUpdate()
+    void FixedUpdate()
     { 
         targetPosition.x = player.transform.position.x;
-        //transform.position = Vector3.Lerp(transform.position, targetPosition, smoothTime);
-        transform.position = targetPosition;
+        Vector3 cameraPosition = Vector3.SmoothDamp(transform.position, targetPosition, ref velocity, smoothTime);
+        transform.position = cameraPosition;
     }
 }
